@@ -1,0 +1,381 @@
+<title>Step Guard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column workbench. Top: connect + measure. Then two foot cards side by side, symmetry strip, recommendations. */
+:root{
+  --bg:#f3f6f6; --panel:#ffffff; --fg:#13262b; --muted:#5b6f74; --line:#d6e0e1;
+  --accent:#0e7c86; --accent-soft:#d3ecee; --warn:#b4570a; --warn-soft:#fbe9d6; --ok:#1f7a4d; --ok-soft:#d9f0e4;
+  --font-body:'Onest',system-ui,sans-serif; --font-mono:'JetBrains Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1a1d; --panel:#142428; --fg:#e4efef; --muted:#93a9ad; --line:#26393d;
+  --accent:#4fc3cc; --accent-soft:#17383c; --warn:#f0a35a; --warn-soft:#3b2a17; --ok:#6bd39b; --ok-soft:#17352a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1a1d; --panel:#142428; --fg:#e4efef; --muted:#93a9ad; --line:#26393d;
+  --accent:#4fc3cc; --accent-soft:#17383c; --warn:#f0a35a; --warn-soft:#3b2a17; --ok:#6bd39b; --ok-soft:#17352a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.5;
+  padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:28px;line-height:1.15;margin:0;font-weight:700;text-wrap:balance}
+h2{font-size:17px;margin:0 0 12px;font-weight:600;text-wrap:balance}
+p{margin:0}
+.sub{color:var(--muted);max-width:62ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{font:inherit;font-weight:600;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--bg);padding:9px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent)}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+textarea{width:100%;min-height:90px;font-family:var(--font-mono);font-size:12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical}
+.log{font-family:var(--font-mono);font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;height:130px;overflow:auto;white-space:pre-wrap;color:var(--muted)}
+.feet{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:20px}
+.foot-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.tag{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+.empty{color:var(--muted);padding:24px 0;text-align:center}
+.diagram{display:flex;justify-content:center}
+.bars{display:grid;grid-template-columns:auto 1fr auto auto;gap:6px 10px;align-items:center;font-size:13px;margin-top:10px}
+.bars .hd{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.bar{height:8px;background:var(--accent-soft);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:14px}
+.metric{border-top:2px solid var(--line);padding-top:6px}
+.metric b{display:block;font-family:var(--font-mono);font-size:20px;font-variant-numeric:tabular-nums}
+.metric span{font-size:12px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--muted);font-weight:500}
+td.n{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.recs{display:flex;flex-direction:column;gap:10px;padding:0;margin:0;list-style:none}
+.recs li{border-left:4px solid var(--warn);background:var(--warn-soft);padding:10px 12px;border-radius:0 8px 8px 0}
+.recs li.ok{border-color:var(--ok);background:var(--ok-soft)}
+.recs b{display:block;font-size:14px}
+.disc{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+details summary{cursor:pointer;font-weight:600}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Step Guard</h1>
+    <p class="sub">Подключи стельки по Bluetooth или вставь строки SUMMARY. Сайт посчитает распределение давления, сравнит левую и правую ногу и подскажет, на что обратить внимание.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="h-in">
+    <h2 id="h-in">1. Откуда берутся данные</h2>
+    <div class="row">
+      <button id="btnConnect">Подключить стельку по Bluetooth</button>
+      <button id="btnStart" class="ghost" disabled>Запустить измерение</button>
+      <button id="btnDemo" class="ghost">Показать пример</button>
+      <button id="btnClear" class="ghost">Очистить</button>
+      <span class="status" id="status">Не подключено</span>
+    </div>
+    <p class="sub" style="margin-top:10px">Bluetooth работает в Chrome и Edge на компьютере и в Chrome на Android. На iPhone браузеры его не поддерживают. Нажми кнопку подключения один раз для каждой стельки: в списке будут StepGuard-L (левая) и StepGuard-R (правая). Если браузер не даёт доступ (например, внутри окна просмотра), открой страницу как отдельный файл или вставь строки вручную ниже.</p>
+    <details style="margin-top:12px">
+      <summary>Запасной вариант: подключение по USB</summary>
+      <div class="row" style="margin-top:8px"><button id="btnUsb" class="ghost">Подключить по USB-кабелю</button></div>
+    </details>
+    <details style="margin-top:12px">
+      <summary>Вставить строки SUMMARY вручную</summary>
+      <textarea id="paste" placeholder="SUMMARY;role=L;steps=17;static_total=2000;stance_ms=560;..." spellcheck="false"></textarea>
+      <div class="row" style="margin-top:8px"><button id="btnParse" class="ghost">Разобрать</button></div>
+    </details>
+    <details style="margin-top:12px">
+      <summary>Что приходит с платы</summary>
+      <div class="log" id="log" aria-live="off" style="margin-top:8px">Здесь будет текст, который стелька присылает по Bluetooth.</div>
+    </details>
+  </section>
+
+  <section class="feet" aria-label="Левая и правая стелька">
+    <article class="panel" id="cardL"></article>
+    <article class="panel" id="cardR"></article>
+  </section>
+
+  <section class="panel" id="sym" aria-labelledby="h-sym"></section>
+  <section class="panel" id="recPanel" aria-labelledby="h-rec"></section>
+
+  <p class="disc">Step Guard выделяет признаки, похожие на отклонения, и не ставит диагноз. Пороги стартовые, они не взяты из клинических стандартов и подбираются на реальных данных. Диагноз ставит только врач.</p>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var ZONES=['Пятка','Свод','Большой палец','Мизинец'];
+  var TH={ARCH_HIGH:30,ARCH_LOW:3,LAT_HIGH:0.60,LAT_LOW:0.30,FORE_HIGH:65,HEEL_HIGH:75,HEELFIRST_MIN:70,SI:10,SHARE_PP:10};
+  var data={L:null,R:null};
+  var ports=[];
+
+  function $(id){return document.getElementById(id);}
+  function fmt(v,d){return (typeof v==='number'&&isFinite(v))?v.toFixed(d):'—';}
+  function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
+
+  function parseSummary(line){
+    var parts=line.trim().split(';');
+    if(parts[0]!=='SUMMARY')return null;
+    var d={};
+    for(var i=1;i<parts.length;i++){
+      var kv=parts[i].split('=');
+      if(kv.length<2)continue;
+      var k=kv[0],v=kv.slice(1).join('=');
+      if(k==='role'){d.role=(v==='L'?'L':(v==='R'?'R':null));}
+      else{var n=parseFloat(v);if(isFinite(n))d[k]=n;}
+    }
+    return d.role?d:null;
+  }
+  function accept(line){
+    var d=parseSummary(line);
+    if(!d)return false;
+    data[d.role]=d;
+    render();
+    return true;
+  }
+  function log(t){
+    var l=$('log');
+    if(l.dataset.fresh!=='0'){l.textContent='';l.dataset.fresh='0';}
+    l.textContent+=t+'\n';
+    l.scrollTop=l.scrollHeight;
+  }
+
+  /* ---------- analysis ---------- */
+  function footFlags(d){
+    var f=[];
+    var arch=d.s1,heel=d.s0,fore=d.s2+d.s3;
+    var lat=(d.s2+d.s3)>0?d.s3/(d.s2+d.s3):null;
+    if(arch>TH.ARCH_HIGH)f.push({k:'arch-high',t:'Свод нагружен сильнее обычного ('+fmt(arch,1)+' %)',r:'Большая доля давления под сводом похожа на плоскостопие. Если стопы устают или болят к вечеру, покажись ортопеду. Хорошо подобранные ортопедические стельки часто помогают.'});
+    if(arch<TH.ARCH_LOW)f.push({k:'arch-low',t:'Свод почти не касается опоры ('+fmt(arch,1)+' %)',r:'Это похоже на высокий свод: нагрузка уходит на пятку и передний отдел. Подбирай мягкую обувь с хорошей амортизацией и при болях обратись к ортопеду.'});
+    if(lat!==null&&lat>TH.LAT_HIGH)f.push({k:'sup',t:'Нагрузка смещена на наружный край',r:'Стопа опирается больше на мизинец, чем на большой палец (признак, похожий на супинацию). Проверь стоптанность обуви с наружной стороны и расскажи об этом специалисту.'});
+    if(lat!==null&&lat<TH.LAT_LOW)f.push({k:'pro',t:'Нагрузка смещена на внутренний край',r:'Стопа заваливается внутрь (признак, похожий на пронацию). Это часто сочетается с плоскостопием, поэтому стоит показаться ортопеду.'});
+    if(fore>TH.FORE_HIGH)f.push({k:'fore',t:'Перекос нагрузки на передний отдел ('+fmt(fore,1)+' %)',r:'Слишком много веса на пальцах и под ними. Проверь, нет ли высокого каблука в обуви, и повтори замер в удобной обуви.'});
+    if(heel>TH.HEEL_HIGH)f.push({k:'heel',t:'Перекос нагрузки на пятку ('+fmt(heel,1)+' %)',r:'Почти весь вес приходится на пятку. Повтори замер, встав ровно и расслабленно; если результат повторяется, обсуди его со специалистом.'});
+    if(typeof d.heelfirst==='number'&&d.heelfirst<TH.HEELFIRST_MIN)f.push({k:'hf',t:'Пятка касается земли первой лишь в '+fmt(d.heelfirst,0)+' % шагов',r:'В здоровой походке обычно первой опускается пятка. Повтори ходьбу в обычном темпе. Если касание с носка повторяется, стоит обратить на это внимание специалиста.'});
+    if(d.steps!==undefined&&d.steps<3)f.push({k:'few',t:'Найдено мало шагов ('+fmt(d.steps,0)+')',r:'Походка оценена не полностью. Повтори ходьбу: пройди 20 секунд ровным шагом, не останавливаясь.'});
+    return f;
+  }
+  function si(a,b){
+    if(typeof a!=='number'||typeof b!=='number'||a<0||b<0)return null;
+    var m=0.5*(a+b);return m===0?null:Math.abs(a-b)/m*100;
+  }
+
+  /* ---------- foot diagram ---------- */
+  function footSvg(d,role){
+    var NS='http://www.w3.org/2000/svg';
+    var svg=document.createElementNS(NS,'svg');
+    svg.setAttribute('viewBox','0 0 200 300');svg.setAttribute('width','170');svg.setAttribute('role','img');
+    svg.setAttribute('aria-label','Распределение давления: '+ZONES.map(function(z,i){return z+' '+fmt(d['s'+i],0)+' %';}).join(', '));
+    var g=document.createElementNS(NS,'g');
+    if(role==='R')g.setAttribute('transform','translate(200 0) scale(-1 1)'); /* inner side of left foot is on the right */
+    var outline=document.createElementNS(NS,'path');
+    outline.setAttribute('d','M95 14 C130 10 150 40 152 76 C154 112 138 130 134 164 C130 200 138 240 124 268 C112 292 78 294 66 266 C54 238 66 196 62 160 C58 122 40 100 44 66 C48 32 70 16 95 14 Z');
+    outline.setAttribute('fill','none');outline.setAttribute('stroke','var(--line)');outline.setAttribute('stroke-width','3');
+    g.appendChild(outline);
+    var pos=[[96,246],[104,166],[116,60],[70,78]]; /* heel, arch, big toe (inner), pinky (outer) */
+    for(var i=0;i<4;i++){
+      var v=Math.max(0,d['s'+i]||0);
+      var c=document.createElementNS(NS,'circle');
+      c.setAttribute('cx',pos[i][0]);c.setAttribute('cy',pos[i][1]);
+      c.setAttribute('r',String(12+Math.min(v,50)*0.55));
+      c.setAttribute('fill','var(--accent)');c.setAttribute('fill-opacity',String(0.12+Math.min(v,50)/50*0.7));
+      c.setAttribute('stroke','var(--accent)');c.setAttribute('stroke-width','1.5');
+      g.appendChild(c);
+    }
+    svg.appendChild(g);
+    /* labels outside mirror so text stays readable */
+    for(var j=0;j<4;j++){
+      var px=pos[j][0];if(role==='R')px=200-px;
+      var t=document.createElementNS(NS,'text');
+      t.setAttribute('x',px);t.setAttribute('y',pos[j][1]+4);t.setAttribute('text-anchor','middle');
+      t.setAttribute('font-size','12');t.setAttribute('font-weight','600');t.setAttribute('fill','var(--fg)');
+      t.textContent=fmt(d['s'+j],0)+'%';
+      svg.appendChild(t);
+    }
+    return svg;
+  }
+
+  function renderFoot(card,role){
+    var d=data[role];
+    card.textContent='';
+    var head=el('div','foot-head');
+    head.appendChild(el('h2',null,role==='L'?'Левая стелька':'Правая стелька'));
+    head.appendChild(el('span','tag',d?('шагов: '+fmt(d.steps,0)):'нет данных'));
+    card.appendChild(head);
+    if(!d){card.appendChild(el('p','empty','Запусти измерение или покажи пример.'));return;}
+    var dg=el('div','diagram');dg.appendChild(footSvg(d,role));card.appendChild(dg);
+    var bars=el('div','bars');
+    bars.appendChild(el('span','hd','Зона'));bars.appendChild(el('span','hd',''));bars.appendChild(el('span','hd num','стоя'));bars.appendChild(el('span','hd num','ходьба'));
+    for(var i=0;i<4;i++){
+      bars.appendChild(el('span',null,ZONES[i]));
+      var b=el('div','bar'),inner=document.createElement('i');inner.style.width=Math.max(0,Math.min(100,d['s'+i]||0))+'%';b.appendChild(inner);bars.appendChild(b);
+      bars.appendChild(el('span','num',fmt(d['s'+i],1)+' %'));
+      bars.appendChild(el('span','num',fmt(d['w'+i],1)+' %'));
+    }
+    card.appendChild(bars);
+    var m=el('div','metrics');
+    [['stance_ms','Время опоры','мс',0],['stride_ms','Интервал шага','мс',0],['cadence','Каденс','шагов/мин',0],['heelfirst','Пятка первой','%',0]].forEach(function(x){
+      var box=el('div','metric');box.appendChild(el('b',null,fmt(d[x[0]],x[3])));box.appendChild(el('span',null,x[1]+', '+x[2]));m.appendChild(box);
+    });
+    card.appendChild(m);
+  }
+
+  function renderSym(){
+    var p=$('sym');p.textContent='';
+    var h=el('h2',null,'2. Сравнение левой и правой ноги');h.id='h-sym';p.appendChild(h);
+    var L=data.L,R=data.R;
+    if(!L||!R){p.appendChild(el('p','empty','Нужны данные обеих стелек. Появится, когда придут две строки SUMMARY.'));return;}
+    var wrap=el('div','tablewrap'),t=document.createElement('table');
+    var thead=document.createElement('thead'),hr=document.createElement('tr');
+    ['Показатель','Левая','Правая','Разница','Оценка'].forEach(function(x){hr.appendChild(el('th',null,x));});
+    thead.appendChild(hr);t.appendChild(thead);
+    var tb=document.createElement('tbody');
+    function row(name,l,r,diffTxt,bad){
+      var tr=document.createElement('tr');
+      tr.appendChild(el('td',null,name));tr.appendChild(el('td','n',l));tr.appendChild(el('td','n',r));tr.appendChild(el('td','n',diffTxt));
+      var td=document.createElement('td');td.appendChild(el('span','pill '+(bad?'warn':'ok'),bad?'проверить':'в пределах'));tr.appendChild(td);
+      tb.appendChild(tr);
+    }
+    [['stance_ms','Время опоры, мс'],['stride_ms','Интервал шага, мс']].forEach(function(x){
+      var s=si(L[x[0]],R[x[0]]);
+      if(s===null)return;
+      row(x[1],fmt(L[x[0]],0),fmt(R[x[0]],0),'SI '+fmt(s,1)+' %',s>TH.SI);
+    });
+    for(var i=0;i<4;i++){
+      var a=L['w'+i],b=R['w'+i];
+      if(typeof a!=='number'||typeof b!=='number')continue;
+      var diff=Math.abs(a-b);
+      row(ZONES[i]+' при ходьбе, %',fmt(a,1),fmt(b,1),fmt(diff,1)+' п.п.',diff>TH.SHARE_PP);
+    }
+    t.appendChild(tb);wrap.appendChild(t);p.appendChild(wrap);
+    p.appendChild(el('p','sub','SI — индекс симметрии: разница между ногами, делённая на среднее значение, в процентах. 0 % означает полную симметрию.'));
+    p.lastChild.style.marginTop='10px';
+  }
+
+  function renderRecs(){
+    var p=$('recPanel');p.textContent='';
+    var h=el('h2',null,'3. На что обратить внимание');h.id='h-rec';p.appendChild(h);
+    var items=[];
+    ['L','R'].forEach(function(role){
+      if(!data[role])return;
+      footFlags(data[role]).forEach(function(f){items.push({side:role==='L'?'Левая':'Правая',f:f});});
+    });
+    if(data.L&&data.R){
+      [['stance_ms','время опоры'],['stride_ms','интервал между шагами']].forEach(function(x){
+        var s=si(data.L[x[0]],data.R[x[0]]);
+        if(s!==null&&s>TH.SI)items.push({side:'Обе',f:{t:'Разное '+x[1]+' слева и справа (SI '+fmt(s,1)+' %)',r:'Походка несимметрична. Повтори замер при ровном темпе, проверь, что обе платы измеряли одновременно. Если разница держится, расскажи об этом специалисту.'}});
+      });
+      var big=0;for(var i=0;i<4;i++){var a=data.L['w'+i],b=data.R['w'+i];if(typeof a==='number'&&typeof b==='number'&&Math.abs(a-b)>TH.SHARE_PP)big++;}
+      if(big>0)items.push({side:'Обе',f:{t:'Нагрузка по зонам различается между ногами ('+big+' из 4 зон)',r:'Одна нога нагружена иначе, чем другая. Это бывает при перекосе таза, боли или привычке опираться на одну ногу. Повтори замер и обрати внимание на то, как ты стоишь.'}});
+    }
+    if(!data.L&&!data.R){p.appendChild(el('p','empty','Рекомендации появятся после первого измерения.'));return;}
+    var ul=el('ul','recs');
+    if(items.length===0){
+      var li=el('li','ok');li.appendChild(el('b',null,'По заданным порогам отклонений не найдено'));li.appendChild(el('span',null,'Это не гарантия здоровья. Повтори измерение в другой день для надёжности.'));ul.appendChild(li);
+    }else{
+      items.forEach(function(it){
+        var li=el('li');li.appendChild(el('b',null,it.side+': '+it.f.t));li.appendChild(el('span',null,it.f.r));ul.appendChild(li);
+      });
+    }
+    p.appendChild(ul);
+  }
+
+  function render(){renderFoot($('cardL'),'L');renderFoot($('cardR'),'R');renderSym();renderRecs();}
+
+  function setStatus(t){$('status').textContent=t;}
+  function handleLine(line){if(line){log(line);accept(line);}}
+  function connCount(){return ports.length;}
+  function refreshButtons(){$('btnStart').disabled=ports.length===0;}
+
+  /* ---------- Bluetooth (Web Bluetooth, Nordic UART) ---------- */
+  var NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e',RXU='6e400002-b5a3-f393-e0a9-e50e24dcca9e',TXU='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+  async function connectBle(){
+    if(!navigator.bluetooth){setStatus('Этот браузер не поддерживает Bluetooth. Нужен Chrome или Edge на компьютере или Chrome на Android.');return;}
+    try{
+      setStatus('Выбери стельку в списке (StepGuard-L или StepGuard-R)...');
+      var dev=await navigator.bluetooth.requestDevice({filters:[{namePrefix:'StepGuard'}],optionalServices:[NUS]});
+      setStatus('Подключаюсь к '+dev.name+'...');
+      var server=await dev.gatt.connect();
+      var svc=await server.getPrimaryService(NUS);
+      var tx=await svc.getCharacteristic(TXU),rx=await svc.getCharacteristic(RXU);
+      var dec=new TextDecoder('utf-8'),buf='';
+      tx.addEventListener('characteristicvaluechanged',function(ev){
+        buf+=dec.decode(ev.target.value,{stream:true});
+        var idx;
+        while((idx=buf.indexOf('\n'))>=0){handleLine(buf.slice(0,idx).replace(/\r$/,''));buf=buf.slice(idx+1);}
+      });
+      await tx.startNotifications();
+      var entry={name:dev.name,send:async function(t){
+        var d=new TextEncoder().encode(t);
+        if(rx.writeValueWithoutResponse)await rx.writeValueWithoutResponse(d);else await rx.writeValue(d);
+      }};
+      ports.push(entry);
+      dev.addEventListener('gattserverdisconnected',function(){
+        var i=ports.indexOf(entry);if(i>=0)ports.splice(i,1);
+        refreshButtons();setStatus(entry.name+' отключена. Подключено: '+connCount());
+      });
+      refreshButtons();
+      setStatus('Подключено: '+ports.map(function(p){return p.name;}).join(', '));
+    }catch(e){
+      setStatus('Не удалось подключиться: '+(e&&e.message?e.message:'отказ')+'. Проверь, что плата включена, рядом, и страница открыта в Chrome или Edge.');
+    }
+  }
+
+  /* ---------- USB (Web Serial), запасной вариант ---------- */
+  async function connect(){
+    if(!('serial' in navigator)){setStatus('Этот браузер не умеет читать USB. Нужен Chrome или Edge на компьютере.');return;}
+    try{
+      var port=await navigator.serial.requestPort();
+      await port.open({baudRate:115200});
+      var enc=new TextEncoderStream();enc.readable.pipeTo(port.writable);
+      var wr=enc.writable.getWriter();
+      var entry={port:port,name:'USB',send:function(t){return wr.write(t);}};
+      ports.push(entry);
+      refreshButtons();
+      setStatus('Подключено: '+ports.length);
+      readLoop(entry);
+    }catch(e){
+      setStatus('Не удалось подключиться: '+(e&&e.message?e.message:'доступ отклонён')+'. Открой страницу как отдельный файл или вставь строки вручную.');
+    }
+  }
+  async function readLoop(entry){
+    var dec=new TextDecoderStream();
+    entry.port.readable.pipeTo(dec.writable).catch(function(){});
+    var reader=dec.readable.getReader(),buf='';
+    try{
+      for(;;){
+        var r=await reader.read();
+        if(r.done)break;
+        buf+=r.value;
+        var idx;
+        while((idx=buf.indexOf('\n'))>=0){
+          var line=buf.slice(0,idx).replace(/\r$/,'');buf=buf.slice(idx+1);
+          handleLine(line);
+        }
+      }
+    }catch(e){setStatus('Связь прервана');}
+  }
+  async function startAll(){
+    for(var i=0;i<ports.length;i++){try{await ports[i].send('s');}catch(e){}}
+    setStatus('Измерение запущено на стельках: '+ports.length+'. Следуй подсказкам в журнале.');
+  }
+
+  /* ---------- wiring ---------- */
+  var SAMPLE_L='SUMMARY;role=L;steps=17;static_total=2000;stance_ms=560;stride_ms=1100;cadence=109;heelfirst=100;s0=45.0;s1=7.5;s2=25.0;s3=22.5;w0=28.6;w1=8.0;w2=37.6;w3=25.9';
+  var SAMPLE_R='SUMMARY;role=R;steps=16;static_total=2100;stance_ms=640;stride_ms=1110;cadence=108;heelfirst=100;s0=44.0;s1=8.5;s2=24.0;s3=23.5;w0=27.0;w1=9.0;w2=36.0;w3=28.0';
+
+  $('btnConnect').addEventListener('click',connectBle);
+  $('btnUsb').addEventListener('click',connect);
+  $('btnStart').addEventListener('click',startAll);
+  $('btnDemo').addEventListener('click',function(){accept(SAMPLE_L);accept(SAMPLE_R);setStatus('Показан пример, не реальные измерения');});
+  $('btnClear').addEventListener('click',function(){data={L:null,R:null};render();setStatus(ports.length?('Подключено: '+ports.length):'Не подключено');});
+  $('btnParse').addEventListener('click',function(){
+    var lines=$('paste').value.split(/\r?\n/),ok=0;
+    lines.forEach(function(l){if(accept(l))ok++;});
+    setStatus(ok?('Разобрано строк: '+ok):'Строки SUMMARY не найдены');
+  });
+  render();
+})();
+</script>
